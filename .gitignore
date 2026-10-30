@@ -1,0 +1,27 @@
+# Environments and Dependencies
+venv/
+.venv/
+env/
+node_modules/
+
+# Python Cache & Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and Runtime Data
+logs/
+*.log
+
+# Build & Bundler Artifacts
+build/
+dist/
+.DS_Store
+
+# Environment Variables
+.env*
+!.env.example

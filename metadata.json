@@ -1,0 +1,6 @@
+{
+  "name": "Smart IoT Environmental Monitor",
+  "description": "Smart IoT Environmental Monitoring and Predictive Automation System with live telemetry, polynomial forecasting, closed-loop actuation, and priority queue analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

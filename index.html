@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart IoT Environmental Monitor</title>
+  <meta name="description" content="Smart IoT Environmental Monitoring and Predictive Automation System with live telemetry, polynomial forecasting, closed-loop actuation, and priority queue analytics.">
+  <meta property="og:title" content="Smart IoT Environmental Monitor">
+  <meta property="og:description" content="Smart IoT Environmental Monitoring and Predictive Automation System with live telemetry, polynomial forecasting, closed-loop actuation, and priority queue analytics.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Connection Warning Banner -->
+  <div id="conn-banner" class="conn-banner hidden">
+    <span>⚠️ Backend disconnected. Reconnecting...</span>
+    <button id="dismiss-banner-btn" class="banner-close" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <div class="app-layout">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <div class="logo-indicator"></div>
+        <h1>Smart IoT Environmental Monitor</h1>
+      </div>
+
+      <div class="topbar-controls">
+        <div class="control-group">
+          <label for="profile-select">Profile</label>
+          <select id="profile-select" class="select-input" aria-label="Environment Profile">
+            <option value="data_center">Data Center</option>
+            <option value="cold_storage">Cold Storage</option>
+            <option value="greenhouse">Greenhouse</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Strategy</span>
+          <div class="toggle-segmented" role="radiogroup" aria-label="Control Strategy">
+            <button id="strat-proactive" class="segment-btn active" data-val="proactive">Proactive</button>
+            <button id="strat-reactive" class="segment-btn" data-val="reactive">Reactive</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Queue</span>
+          <div class="toggle-segmented" role="radiogroup" aria-label="Pipeline Queue Mode">
+            <button id="mode-priority" class="segment-btn active" data-val="priority">Priority</button>
+            <button id="mode-fifo" class="segment-btn" data-val="fifo">FIFO</button>
+          </div>
+        </div>
+
+        <div id="timescale-chip" class="pill-chip time-chip" title="Simulation Time Scale">1 s = 1.0 sim-min</div>
+        <div id="connection-pill" class="pill-chip conn-chip connected"><span class="dot"></span> Online</div>
+
+        <button id="open-eval-btn" class="btn btn-secondary">📊 Evaluation</button>
+        <button id="toggle-demo-btn" class="btn btn-primary">▶ Guided Demo</button>
+      </div>
+    </header>
+
+    <!-- KPI Row -->
+    <section class="kpi-row" aria-label="Key Performance Indicators">
+      <div class="kpi-card">
+        <span class="kpi-label">Nodes Online</span>
+        <span id="kpi-nodes" class="kpi-val">0 / 0</span>
+        <span class="kpi-sub" id="kpi-nodes-sub">All active</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Throughput</span>
+        <span id="kpi-throughput" class="kpi-val">0.0 <small>msgs/s</small></span>
+        <span class="kpi-sub" id="kpi-processed-sub">0 total</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Queue Depth</span>
+        <span id="kpi-queue" class="kpi-val">0</span>
+        <span class="kpi-sub" id="kpi-queue-sub">P0: 0 | P1: 0 | P2: 0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Dropped Packets</span>
+        <span id="kpi-dropped" class="kpi-val">0</span>
+        <span class="kpi-sub" id="kpi-loss-sub">Loss: 0.0%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Critical Alerts</span>
+        <span id="kpi-alerts" class="kpi-val text-critical">0</span>
+        <span class="kpi-sub" id="kpi-alerts-sub">0 nodes critical</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Avg P95 Latency</span>
+        <span id="kpi-latency" class="kpi-val">0 <small>ms</small></span>
+        <span class="kpi-sub" id="kpi-wrangle-sub">Wrangle: 0.0 ms</span>
+      </div>
+    </section>
+
+    <!-- Main Content 3-Column Grid -->
+    <main class="main-grid">
+      <!-- Left: Simulation Controls -->
+      <aside class="panel sim-controls-panel">
+        <div class="panel-header">
+          <h2>Simulation Controls</h2>
+          <span class="panel-badge">Interactive</span>
+        </div>
+
+        <div class="scenarios-container">
+          <label class="section-label">Preset Scenarios</label>
+          <div class="chips-row" role="group" aria-label="Scenarios">
+            <button class="chip-btn" data-scenario="normal">Normal</button>
+            <button class="chip-btn" data-scenario="heat_spike">Heat Spike</button>
+            <button class="chip-btn" data-scenario="humidity_drift">Humidity Drift</button>
+            <button class="chip-btn" data-scenario="sensor_fault">Sensor Fault</button>
+            <button class="chip-btn" data-scenario="burst_traffic">Burst Traffic</button>
+          </div>
+        </div>
+
+        <div class="node-selection-bar">
+          <div class="node-tabs" id="sim-node-tabs" role="tablist" aria-label="Simulated Nodes"></div>
+          <div class="node-actions">
+            <button id="add-node-btn" class="icon-btn" title="Add Node" aria-label="Add Node">+</button>
+            <button id="remove-node-btn" class="icon-btn" title="Remove Node" aria-label="Remove Node">&minus;</button>
+          </div>
+        </div>
+
+        <!-- Node Control Sliders -->
+        <div class="node-controls-form">
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-temp">Temperature Target</label>
+              <span id="badge-temp" class="badge-val badge-temp">-- °C</span>
+            </div>
+            <input type="range" id="slider-temp" class="range-slider track-gradient" min="0" max="100" step="0.5">
+            <div class="slider-bounds">
+              <span id="bound-temp-min">--</span>
+              <span id="bound-temp-max">--</span>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-hum">Humidity Target</label>
+              <span id="badge-hum" class="badge-val badge-hum">-- %</span>
+            </div>
+            <input type="range" id="slider-hum" class="range-slider track-gradient" min="0" max="100" step="1">
+            <div class="slider-bounds">
+              <span id="bound-hum-min">--</span>
+              <span id="bound-hum-max">--</span>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-aqi">AQI Target</label>
+              <span id="badge-aqi" class="badge-val badge-aqi">-- AQI</span>
+            </div>
+            <input type="range" id="slider-aqi" class="range-slider track-gradient" min="0" max="500" step="1">
+            <div class="slider-bounds">
+              <span id="bound-aqi-min">--</span>
+              <span id="bound-aqi-max">--</span>
+            </div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-noise">Noise Level</label>
+              <span id="badge-noise" class="badge-val">0.20</span>
+            </div>
+            <input type="range" id="slider-noise" class="range-slider" min="0" max="1" step="0.05" value="0.2">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-rate">Send Rate</label>
+              <span id="badge-rate" class="badge-val">1.0 Hz</span>
+            </div>
+            <input type="range" id="slider-rate" class="range-slider" min="0.2" max="20" step="0.2" value="1.0">
+          </div>
+
+          <div class="form-row">
+            <label class="control-label">Fault Mode</label>
+            <div class="segmented-control" id="fault-mode-group">
+              <button class="seg-btn active" data-fault="none">None</button>
+              <button class="seg-btn" data-fault="dropout">Dropout</button>
+              <button class="seg-btn" data-fault="outlier">Outlier</button>
+              <button class="seg-btn" data-fault="stuck">Stuck</button>
+            </div>
+          </div>
+
+          <div class="form-row toggle-row">
+            <label for="node-enable-toggle" class="control-label">Node Telemetry Enabled</label>
+            <input type="checkbox" id="node-enable-toggle" class="toggle-checkbox" checked>
+          </div>
+        </div>
+
+        <div class="pipeline-settings-box">
+          <label class="section-label">Pipeline Engine Parameters</label>
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-workers">Worker Threads</label>
+              <span id="badge-workers" class="badge-val">3</span>
+            </div>
+            <input type="range" id="slider-workers" class="range-slider" min="1" max="8" step="1" value="3">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-delay">Processing Delay</label>
+              <span id="badge-delay" class="badge-val">5 ms</span>
+            </div>
+            <input type="range" id="slider-delay" class="range-slider" min="0" max="200" step="5" value="5">
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="slider-horizon">Forecast Horizon</label>
+              <span id="badge-horizon" class="badge-val">15 min</span>
+            </div>
+            <input type="range" id="slider-horizon" class="range-slider" min="15" max="30" step="1" value="15">
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Live Monitoring -->
+      <section class="panel center-monitor-panel">
+        <div class="panel-header">
+          <div class="header-titles">
+            <h2>Live Environmental Telemetry</h2>
+            <span id="active-node-name" class="node-title-badge">Node-1</span>
+          </div>
+
+          <div class="metric-tabs" role="tablist" aria-label="Metric Views">
+            <button class="metric-tab active" data-metric="temperature">Temperature</button>
+            <button class="metric-tab" data-metric="humidity">Humidity</button>
+            <button class="metric-tab" data-metric="aqi">AQI</button>
+          </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="chart-wrapper">
+          <canvas id="telemetry-chart" aria-label="Live Telemetry and Forecast Chart"></canvas>
+          <div class="chart-legend-custom">
+            <span class="leg-item"><span class="leg-color raw-color"></span> Raw Telemetry</span>
+            <span class="leg-item"><span class="leg-color clean-color"></span> EMA Smoothed</span>
+            <span class="leg-item"><span class="leg-color fc-color"></span> Predictive Forecast (15-30m)</span>
+            <span class="leg-item"><span class="leg-color safe-color"></span> Safe Thresholds</span>
+            <span class="leg-item"><span class="leg-color hard-color"></span> Hard Safety Limits</span>
+          </div>
+        </div>
+
+        <!-- Health Tiles Grid -->
+        <div class="health-tiles-section">
+          <h3>Node Ensemble Health</h3>
+          <div id="health-tiles-grid" class="health-grid"></div>
+        </div>
+      </section>
+
+      <!-- Right: System Internals -->
+      <aside class="panel internals-panel">
+        <div class="panel-header">
+          <h2>System Internals</h2>
+          <span class="panel-badge">Real-time</span>
+        </div>
+
+        <!-- Pipeline Diagram -->
+        <div class="internals-card">
+          <label class="section-label">Pipeline Ingestion Flow</label>
+          <div class="flow-diagram">
+            <div class="flow-step">
+              <span class="flow-title">Ingest</span>
+              <span id="flow-ingest" class="flow-stat">0</span>
+            </div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-step queue-step">
+              <span class="flow-title">Priority Queue</span>
+              <span id="flow-queue" class="flow-stat">0</span>
+              <div class="queue-split-bar" title="Queue Priority Mix">
+                <div id="q-p0" class="q-segment q-p0" style="width: 0%"></div>
+                <div id="q-p1" class="q-segment q-p1" style="width: 0%"></div>
+                <div id="q-p2" class="q-segment q-p2" style="width: 0%"></div>
+              </div>
+            </div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-step">
+              <span class="flow-title">Workers</span>
+              <span id="flow-workers" class="flow-stat">3</span>
+            </div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-step">
+              <span class="flow-title">Wrangler</span>
+              <span id="flow-wrangle" class="flow-stat">0.0ms</span>
+            </div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-step">
+              <span class="flow-title">Forecast</span>
+              <span id="flow-forecast" class="flow-stat">Active</span>
+            </div>
+            <span class="flow-arrow">&rarr;</span>
+            <div class="flow-step">
+              <span class="flow-title">Actuator</span>
+              <span id="flow-actuations" class="flow-stat">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Latency Card -->
+        <div class="internals-card">
+          <label class="section-label">Latency by Priority Tier</label>
+          <div class="latency-grid">
+            <div class="latency-tier">
+              <span class="tier-label text-critical">Critical (P0)</span>
+              <span id="lat-p0" class="tier-val">-- ms</span>
+            </div>
+            <div class="latency-tier">
+              <span class="tier-label text-warning">Anomaly (P1)</span>
+              <span id="lat-p1" class="tier-val">-- ms</span>
+            </div>
+            <div class="latency-tier">
+              <span class="tier-label text-cyan">Normal (P2)</span>
+              <span id="lat-p2" class="tier-val">-- ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actuator State and Overrides -->
+        <div class="internals-card">
+          <div class="card-head-row">
+            <label class="section-label">Actuator Outputs & Overrides</label>
+            <button id="restart-node-btn" class="btn btn-xs btn-critical hidden">Restart Node</button>
+          </div>
+          <div id="actuator-chips-container" class="actuators-grid"></div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="internals-card log-card">
+          <div class="log-header">
+            <label class="section-label">System Event & Actuation Log</label>
+            <div class="log-actions">
+              <button id="pause-scroll-btn" class="btn btn-xs btn-outline">Scroll: Auto</button>
+            </div>
+          </div>
+          <div class="log-filters">
+            <button class="filter-chip active" data-filter="all">All</button>
+            <button class="filter-chip" data-filter="warn">Warnings</button>
+            <button class="filter-chip" data-filter="critical">Critical</button>
+            <button class="filter-chip" data-filter="actuation">Actuations</button>
+          </div>
+          <div id="event-log-list" class="event-log-container"></div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Guided Demo Floating Bar -->
+    <div id="demo-bar" class="demo-bar hidden" role="region" aria-label="Guided Demonstration Bar">
+      <div class="demo-info">
+        <span id="demo-step-badge" class="step-badge">Step 1/6</span>
+        <p id="demo-caption" class="demo-caption">Welcome to the Smart IoT Predictive Automation demonstration...</p>
+      </div>
+      <div class="demo-timer">
+        <span id="demo-countdown" class="demo-countdown">15.0s</span>
+      </div>
+      <div class="demo-controls">
+        <button id="demo-pause-btn" class="btn btn-sm btn-secondary">Pause</button>
+        <button id="demo-stop-btn" class="btn btn-sm btn-critical">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evaluation Modal -->
+  <div id="eval-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="eval-modal-title">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="eval-modal-title">Performance Evaluation & Benchmark Results</h2>
+        <div class="modal-header-actions">
+          <button id="export-csv-btn" class="btn btn-sm btn-secondary">📥 Export CSV</button>
+          <button id="close-eval-btn" class="modal-close-btn" aria-label="Close Modal">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <!-- Live Benchmark Metrics Row -->
+        <div class="eval-kpi-grid">
+          <div class="eval-stat-card">
+            <span class="stat-title">Packet Loss</span>
+            <span id="eval-loss" class="stat-value">0.0%</span>
+            <span class="stat-desc">Ingress reliability</span>
+          </div>
+          <div class="eval-stat-card">
+            <span class="stat-title">Critical P95 Latency</span>
+            <span id="eval-crit-lat" class="stat-value">-- ms</span>
+            <span class="stat-desc">High-priority SLA</span>
+          </div>
+          <div class="eval-stat-card">
+            <span class="stat-title">Forecast Accuracy</span>
+            <span id="eval-mae" class="stat-value">-- MAE</span>
+            <span class="stat-desc">Trajectory error</span>
+          </div>
+          <div class="eval-stat-card">
+            <span class="stat-title">Breaches Anticipated</span>
+            <span id="eval-anticipated" class="stat-value text-ok">0 / 0</span>
+            <span class="stat-desc">Early warnings</span>
+          </div>
+          <div class="eval-stat-card">
+            <span class="stat-title">Breaches Prevented</span>
+            <span id="eval-prevented" class="stat-value text-ok">0</span>
+            <span class="stat-desc">Closed-loop mitigation</span>
+          </div>
+          <div class="eval-stat-card">
+            <span class="stat-title">Avg Warning Lead Time</span>
+            <span id="eval-leadtime" class="stat-value">0.0 s</span>
+            <span class="stat-desc">Early warning margin</span>
+          </div>
+        </div>
+
+        <!-- Benchmark Execution Section -->
+        <div class="benchmark-runner-box">
+          <div class="runner-row">
+            <div class="runner-desc">
+              <h3>Benchmark Harness</h3>
+              <p>Run automated head-to-head simulations to quantify the benefits of predictive closed-loop actuation and priority queuing.</p>
+            </div>
+            <div class="runner-buttons">
+              <button id="run-bench-strategy" class="btn btn-primary">Run Strategy Benchmark (Proactive vs Reactive)</button>
+              <button id="run-bench-pipeline" class="btn btn-secondary">Run Pipeline Benchmark (Priority vs FIFO)</button>
+            </div>
+          </div>
+
+          <!-- Benchmark Progress Bar -->
+          <div id="bench-progress-container" class="bench-progress-container hidden">
+            <div class="progress-info">
+              <span id="bench-phase-label">Preparing benchmark...</span>
+              <span id="bench-pct-label">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="bench-progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Benchmark Results Comparison Cards -->
+        <div class="bench-results-section">
+          <h3>Benchmark Comparisons</h3>
+          <div id="bench-results-container" class="bench-cards-grid">
+            <div class="empty-state">No benchmark executed yet. Click one of the buttons above to run an experiment.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
