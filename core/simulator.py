@@ -207,56 +207,94 @@ class SimulatorManager:
             self.store.unregister_node(node_id)
             return node_id
 
-    def apply_scenario(self, name: str) -> None:
-        """Apply pre-configured test scenarios across the node ensemble."""
+    def apply_scenario(self, name: str, node_id: str | None = None) -> None:
+        """Apply pre-configured test scenarios across the node ensemble or specific node."""
         with self._lock:
             lims = self.store.all_limits()
             targets_mid = self._get_midpoint_targets()
+            is_all = (node_id == "all")
 
             if name == "normal":
-                for node in self._nodes.values():
+                if node_id and not is_all and node_id in self._nodes:
+                    node = self._nodes[node_id]
                     node.target = dict(targets_mid)
                     node.noise = config.DEFAULT_NOISE
                     node.send_rate_hz = 1.0
                     node.fault_mode = "none"
                     node.enabled = True
                     self.store.set_node_controls(node.node_id, node.get_controls())
+                else:
+                    for node in self._nodes.values():
+                        node.target = dict(targets_mid)
+                        node.noise = config.DEFAULT_NOISE
+                        node.send_rate_hz = 1.0
+                        node.fault_mode = "none"
+                        node.enabled = True
+                        self.store.set_node_controls(node.node_id, node.get_controls())
 
             elif name == "heat_spike":
-                if "node-1" not in self._nodes:
-                    self.add_node("node-1")
                 t_lim = lims["temperature"]
                 spike_target = t_lim.safe_max + 0.8 * (t_lim.hard_max - t_lim.safe_max)
-                self.set_controls("node-1", {"target": {"temperature": spike_target}})
+                if is_all:
+                    for nid in list(self._nodes.keys()):
+                        self.set_controls(nid, {"target": {"temperature": spike_target}})
+                else:
+                    target_node = node_id if (node_id and node_id in self._nodes) else "node-1"
+                    if target_node not in self._nodes:
+                        self.add_node(target_node)
+                    self.set_controls(target_node, {"target": {"temperature": spike_target}})
 
             elif name in ("humidity_drift", "humidity_leak"):
-                if "node-2" not in self._nodes:
-                    self.add_node("node-2")
                 h_lim = lims["humidity"]
                 drift_target = h_lim.safe_max + 0.8 * (h_lim.hard_max - h_lim.safe_max)
-                self.set_controls("node-2", {"target": {"humidity": drift_target}})
+                if is_all:
+                    for nid in list(self._nodes.keys()):
+                        self.set_controls(nid, {"target": {"humidity": drift_target}})
+                else:
+                    target_node = node_id if (node_id and node_id in self._nodes) else "node-2"
+                    if target_node not in self._nodes:
+                        self.add_node(target_node)
+                    self.set_controls(target_node, {"target": {"humidity": drift_target}})
 
             elif name in ("sensor_fault", "sensor_failure"):
-                if "node-3" not in self._nodes:
-                    self.add_node("node-3")
-                self.set_controls("node-3", {"fault_mode": "outlier", "noise": 0.5})
+                if is_all:
+                    for nid in list(self._nodes.keys()):
+                        self.set_controls(nid, {"fault_mode": "outlier", "noise": 0.5})
+                else:
+                    target_node = node_id if (node_id and node_id in self._nodes) else "node-3"
+                    if target_node not in self._nodes:
+                        self.add_node(target_node)
+                    self.set_controls(target_node, {"fault_mode": "outlier", "noise": 0.5})
 
             elif name == "burst_traffic":
-                for node_id in self._nodes:
+                if node_id and not is_all and node_id in self._nodes:
                     self.set_controls(node_id, {"send_rate_hz": 15.0})
+                else:
+                    for nid in list(self._nodes.keys()):
+                        self.set_controls(nid, {"send_rate_hz": 15.0})
 
             elif name == "cascade_failure":
-                if "node-1" not in self._nodes:
-                    self.add_node("node-1")
-                if "node-2" not in self._nodes:
-                    self.add_node("node-2")
-                if "node-3" not in self._nodes:
-                    self.add_node("node-3")
-                t_lim = lims["temperature"]
-                h_lim = lims["humidity"]
-                self.set_controls("node-1", {"target": {"temperature": t_lim.hard_max + 1.0}})
-                self.set_controls("node-2", {"target": {"humidity": h_lim.hard_max + 2.0}})
-                self.set_controls("node-3", {"fault_mode": "outlier", "noise": 0.6, "send_rate_hz": 5.0})
+                if is_all or not node_id:
+                    if "node-1" not in self._nodes:
+                        self.add_node("node-1")
+                    if "node-2" not in self._nodes:
+                        self.add_node("node-2")
+                    if "node-3" not in self._nodes:
+                        self.add_node("node-3")
+                    t_lim = lims["temperature"]
+                    h_lim = lims["humidity"]
+                    self.set_controls("node-1", {"target": {"temperature": t_lim.hard_max + 1.0}})
+                    self.set_controls("node-2", {"target": {"humidity": h_lim.hard_max + 2.0}})
+                    self.set_controls("node-3", {"fault_mode": "outlier", "noise": 0.6, "send_rate_hz": 5.0})
+                else:
+                    t_lim = lims["temperature"]
+                    h_lim = lims["humidity"]
+                    self.set_controls(node_id, {
+                        "target": {"temperature": t_lim.hard_max + 1.0, "humidity": h_lim.hard_max + 2.0},
+                        "fault_mode": "outlier",
+                        "noise": 0.6,
+                        "send_rate_hz": 5.0
+                    })
 
             else:
                 raise ValueError(f"Unknown scenario name: {name}")

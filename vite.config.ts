@@ -9,13 +9,10 @@ function pythonBackendPlugin(): Plugin {
   return {
     name: 'python-backend-runner',
     configureServer() {
-      // Check if Python Flask server on port 5000 is active; if not, spawn python3 run.py
-      const req = http.get('http://127.0.0.1:5000/api/health', (res) => {
-        if (res.statusCode === 200) {
-          console.log('[backend] Python Flask backend active on port 5000');
-        }
-      });
-      req.on('error', () => {
+      let spawned = false;
+      function startPython() {
+        if (spawned) return;
+        spawned = true;
         console.log('[backend] Starting Python Flask backend daemon (python3 run.py)...');
         const py = spawn('python3', ['run.py'], {
           cwd: process.cwd(),
@@ -23,6 +20,7 @@ function pythonBackendPlugin(): Plugin {
         });
         py.on('exit', (code) => {
           console.log(`[backend] Python backend exited with code ${code}`);
+          spawned = false;
         });
         const cleanExit = () => {
           try {
@@ -32,6 +30,21 @@ function pythonBackendPlugin(): Plugin {
         process.on('exit', cleanExit);
         process.on('SIGINT', cleanExit);
         process.on('SIGTERM', cleanExit);
+      }
+
+      const req = http.get('http://127.0.0.1:5000/api/health', (res) => {
+        if (res.statusCode === 200) {
+          console.log('[backend] Python Flask backend active on port 5000');
+        } else {
+          startPython();
+        }
+      });
+      req.on('error', () => {
+        startPython();
+      });
+      req.setTimeout(800, () => {
+        req.destroy();
+        startPython();
       });
     },
   };

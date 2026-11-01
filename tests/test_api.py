@@ -159,8 +159,8 @@ def test_end_to_end_rising_ramp_proactive_vs_reactive(client_and_system):
     client, system = client_and_system
     node = "node-1"
 
-    # 1. Proactive Mode
-    system.apply_settings({"strategy": "proactive", "processing_delay_ms": 0.0, "time_scale": 60.0, "horizon_min": 15.0})
+    # 1. Proactive Mode (use 1 worker for deterministic chronological processing)
+    system.apply_settings({"strategy": "proactive", "processing_delay_ms": 0.0, "time_scale": 60.0, "horizon_min": 15.0, "workers": 1})
     system.reset_runtime()
 
     # Data center safe_max is 27.0 °C.
@@ -180,8 +180,11 @@ def test_end_to_end_rising_ramp_proactive_vs_reactive(client_and_system):
         res = client.post("/api/ingest", json=payload)
         assert res.status_code == 202
 
-    # Give worker pool a moment to process queue
-    time.sleep(0.3)
+    # Wait for worker pool to process all queued items
+    for _ in range(50):
+        if system.pipeline._queue.qsize() == 0 and system.store.counters().get("processed", 0) >= 25:
+            break
+        time.sleep(0.05)
 
     # Verify forecast with ETA appeared
     fcasts = system.store.forecasts(node)
@@ -216,7 +219,10 @@ def test_end_to_end_rising_ramp_proactive_vs_reactive(client_and_system):
         }
         client.post("/api/ingest", json=payload)
 
-    time.sleep(0.3)
+    for _ in range(50):
+        if system.pipeline._queue.qsize() == 0 and system.store.counters().get("processed", 0) >= 25:
+            break
+        time.sleep(0.05)
 
     # In reactive mode, since temp (26.4) is <= safe_max (27.0), level MUST be OK (NOT WATCH)
     reactive_levels = system.store.levels(node)

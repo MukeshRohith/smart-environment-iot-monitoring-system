@@ -56,6 +56,12 @@
         <div id="timescale-chip" class="pill-chip time-chip" title="Simulation Time Scale">1 s = 1.0 sim-min</div>
         <div id="connection-pill" class="pill-chip conn-chip connected"><span class="dot"></span> Online</div>
 
+        <div id="topbar-demo-pill" class="topbar-demo-pill hidden" title="Active Guided Demo Scenario">
+          <span class="pill-dot pulse"></span>
+          <span id="topbar-demo-scenario">Normal</span>
+          <span id="topbar-demo-timer" class="demo-pill-timer">15.0s</span>
+        </div>
+
         <button id="open-eval-btn" class="btn btn-secondary">📊 Evaluation</button>
         <button id="toggle-demo-btn" class="btn btn-primary">▶ Guided Demo</button>
       </div>
@@ -105,9 +111,26 @@
         </div>
 
         <div class="scenarios-container">
-          <label class="section-label">Preset Scenarios</label>
+          <div class="scenarios-header">
+            <div class="scenarios-title-wrap">
+              <label class="section-label">Preset Scenarios</label>
+              <div class="scenario-scope-toggle" role="group" aria-label="Scenario Target Scope">
+                <button type="button" id="scope-node-btn" class="scope-btn active" title="Apply preset to currently active node">
+                  This Node (<span id="scope-node-label">NODE-1</span>)
+                </button>
+                <button type="button" id="scope-all-btn" class="scope-btn" title="Apply preset across all simulated nodes">
+                  All Nodes
+                </button>
+              </div>
+            </div>
+            <div id="demo-scenario-pill" class="demo-scenario-pill hidden" title="Scenario running under Guided Demo">
+              <span class="pill-dot pulse"></span>
+              <span id="demo-pill-title">Normal</span>
+              <span id="demo-pill-timer" class="demo-pill-timer">15.0s</span>
+            </div>
+          </div>
           <div class="chips-row" role="group" aria-label="Scenarios">
-            <button class="chip-btn" data-scenario="normal">Normal</button>
+            <button class="chip-btn active" data-scenario="normal">Normal</button>
             <button class="chip-btn" data-scenario="heat_spike">Heat Spike</button>
             <button class="chip-btn" data-scenario="humidity_drift">Humidity Drift</button>
             <button class="chip-btn" data-scenario="sensor_fault">Sensor Fault</button>
@@ -354,6 +377,10 @@
     <div id="demo-bar" class="demo-bar hidden" role="region" aria-label="Guided Demonstration Bar">
       <div class="demo-info">
         <span id="demo-step-badge" class="step-badge">Step 1/6</span>
+        <div id="demo-bar-scenario-pill" class="demo-scenario-pill">
+          <span class="pill-dot pulse"></span>
+          <span id="demo-bar-scenario-name">Baseline Normal</span>
+        </div>
         <p id="demo-caption" class="demo-caption">Welcome to the Smart IoT Predictive Automation demonstration...</p>
       </div>
       <div class="demo-timer">

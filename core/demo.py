@@ -47,14 +47,35 @@ class DemoRunner:
         self._caption: str = ""
         self._summary: dict[str, Any] | None = None
 
+    @property
+    def _step_durations(self) -> dict[int, float]:
+        """Configured step durations."""
+        return self._durations
+
+    @_step_durations.setter
+    def _step_durations(self, val: dict[int, float]) -> None:
+        """Update configured step durations."""
+        self._durations.update(val)
+
+    STEP_SCENARIOS: dict[int, str] = {
+        1: "normal",
+        2: "heat_spike",
+        3: "sensor_fault",
+        4: "burst_traffic",
+        5: "humidity_drift",
+        6: "summary",
+    }
+
     def state(self) -> dict[str, Any]:
         """Return snapshot of current demo progress, step caption, and remaining time."""
         with self._lock:
             return {
                 "running": self._running,
+                "active": self._running,
                 "paused": self._paused,
                 "step": self._current_step,
                 "steps_total": 6,
+                "scenario": self.STEP_SCENARIOS.get(self._current_step, "normal"),
                 "caption": self._caption,
                 "remaining_s": round(max(0.0, self._remaining_s), 2),
                 "summary": self._summary,

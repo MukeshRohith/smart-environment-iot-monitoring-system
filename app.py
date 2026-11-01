@@ -164,7 +164,9 @@ def create_app(system: System | None = None) -> Flask:
         data = request.get_json(silent=True) or {}
         node_id = data.get("node_id") or data.get("node")
         controls = data.get("controls")
-        if not node_id or not isinstance(controls, dict):
+        if not controls or not isinstance(controls, dict):
+            controls = {k: v for k, v in data.items() if k not in ("node_id", "node")}
+        if not node_id or not isinstance(controls, dict) or not controls:
             return jsonify({"error": "node_id and controls dict required"}), 400
 
         try:
@@ -178,13 +180,14 @@ def create_app(system: System | None = None) -> Flask:
     def set_sim_scenario() -> tuple[Response, int]:
         """Activate preset simulation scenario."""
         data = request.get_json(silent=True) or {}
-        name = data.get("name")
+        name = data.get("name") or data.get("scenario")
+        node_id = data.get("node_id") or data.get("node")
         if not name:
             return jsonify({"error": "Missing scenario 'name'"}), 400
 
         try:
-            sys_instance.simulator.apply_scenario(name)
-            return jsonify({"scenario": name, "status": "applied"}), 200
+            sys_instance.simulator.apply_scenario(name, node_id=node_id)
+            return jsonify({"scenario": name, "node_id": node_id, "status": "applied"}), 200
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
@@ -192,7 +195,7 @@ def create_app(system: System | None = None) -> Flask:
     def manage_sim_nodes() -> tuple[Response, int]:
         """Dynamically add or remove nodes from the simulation ensemble."""
         data = request.get_json(silent=True) or {}
-        action = data.get("action")
+        action = data.get("action", "add")
         node_id = data.get("node_id")
 
         if action not in ("add", "remove"):
@@ -206,6 +209,19 @@ def create_app(system: System | None = None) -> Flask:
 
             return jsonify({
                 "action": action,
+                "node_id": nid,
+                "nodes": sys_instance.store.node_ids(),
+            }), 200
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/sim/nodes/<node_id>", methods=["DELETE"])
+    def delete_sim_node(node_id: str) -> tuple[Response, int]:
+        """Delete/remove a node from the simulation ensemble."""
+        try:
+            nid = sys_instance.simulator.remove_node(node_id)
+            return jsonify({
+                "action": "remove",
                 "node_id": nid,
                 "nodes": sys_instance.store.node_ids(),
             }), 200

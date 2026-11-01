@@ -10,6 +10,8 @@
   const state = {
     activeNodeId: 'node-1',
     activeMetric: 'temperature',
+    activeScenario: 'normal',
+    scenarioScope: 'node',
     activeLogFilter: 'all',
     autoScroll: true,
     activeDragging: new Set(),
@@ -143,13 +145,23 @@
     dom.pauseScrollBtn = document.getElementById('pause-scroll-btn');
     dom.eventLogList = document.getElementById('event-log-list');
 
-    // Demo Bar
+    // Demo Bar and Scenario Pills
     dom.demoBar = document.getElementById('demo-bar');
     dom.demoStepBadge = document.getElementById('demo-step-badge');
     dom.demoCaption = document.getElementById('demo-caption');
     dom.demoCountdown = document.getElementById('demo-countdown');
     dom.demoPauseBtn = document.getElementById('demo-pause-btn');
     dom.demoStopBtn = document.getElementById('demo-stop-btn');
+    dom.demoBarScenarioName = document.getElementById('demo-bar-scenario-name');
+    dom.topbarDemoPill = document.getElementById('topbar-demo-pill');
+    dom.topbarDemoScenario = document.getElementById('topbar-demo-scenario');
+    dom.topbarDemoTimer = document.getElementById('topbar-demo-timer');
+    dom.demoScenarioPill = document.getElementById('demo-scenario-pill');
+    dom.demoPillTitle = document.getElementById('demo-pill-title');
+    dom.demoPillTimer = document.getElementById('demo-pill-timer');
+    dom.scopeNodeBtn = document.getElementById('scope-node-btn');
+    dom.scopeAllBtn = document.getElementById('scope-all-btn');
+    dom.scopeNodeLabel = document.getElementById('scope-node-label');
 
     // Evaluation Modal
     dom.evalModal = document.getElementById('eval-modal');
@@ -805,6 +817,9 @@
     if (dom.activeNodeName) {
       dom.activeNodeName.textContent = state.activeNodeId.toUpperCase();
     }
+    if (dom.scopeNodeLabel) {
+      dom.scopeNodeLabel.textContent = state.activeNodeId.toUpperCase();
+    }
 
     // 5. Sliders update (protect from overwrite while user is dragging)
     const activeNode = nodes[state.activeNodeId];
@@ -942,20 +957,63 @@
     // 10. Event log
     renderEventLog(snapshot.events, snapshot.actuations);
 
-    // 11. Guided demo floating bar
+    // 11. Guided demo floating bar and scenario pills
     const demo = snapshot.demo || {};
-    if (dom.demoBar) {
-      if (demo.active) {
+    const isDemoRunning = Boolean(demo.running || demo.active);
+    const stepNum = demo.step || 1;
+    const totalSteps = demo.steps_total || demo.total_steps || 6;
+    const remSec = Math.max(0, demo.remaining_s || 0);
+
+    const scenarioTitles = {
+      1: 'Baseline Normal',
+      2: 'Heat Spike',
+      3: 'Sensor Fault',
+      4: 'Burst Traffic',
+      5: 'Humidity Drift',
+      6: 'Evaluation Summary'
+    };
+    const stepScenarioKeys = {
+      1: 'normal',
+      2: 'heat_spike',
+      3: 'sensor_fault',
+      4: 'burst_traffic',
+      5: 'humidity_drift',
+      6: 'normal'
+    };
+
+    const activeDemoScenarioName = demo.scenario_name || scenarioTitles[stepNum] || `Scenario ${stepNum}`;
+    const activeDemoScenarioKey = demo.scenario || stepScenarioKeys[stepNum] || 'normal';
+
+    if (isDemoRunning) {
+      if (dom.demoBar) {
         dom.demoBar.classList.remove('hidden');
-        if (dom.demoStepBadge) dom.demoStepBadge.textContent = `Step ${(demo.step || 0) + 1}/${demo.total_steps || 6}`;
-        if (dom.demoCaption) dom.demoCaption.textContent = demo.description || 'Guided demonstration in progress...';
-        if (dom.demoCountdown) dom.demoCountdown.textContent = `${(demo.remaining_s || 0).toFixed(1)}s`;
+        if (dom.demoStepBadge) dom.demoStepBadge.textContent = `Step ${stepNum}/${totalSteps}`;
+        if (dom.demoBarScenarioName) dom.demoBarScenarioName.textContent = activeDemoScenarioName;
+        if (dom.demoCaption) dom.demoCaption.textContent = demo.caption || demo.description || 'Guided demonstration in progress...';
+        if (dom.demoCountdown) dom.demoCountdown.textContent = `${remSec.toFixed(1)}s`;
         if (dom.demoPauseBtn) dom.demoPauseBtn.textContent = demo.paused ? 'Resume' : 'Pause';
-        if (dom.toggleDemoBtn) dom.toggleDemoBtn.textContent = '⏹ Stop Demo';
-      } else {
-        dom.demoBar.classList.add('hidden');
-        if (dom.toggleDemoBtn) dom.toggleDemoBtn.textContent = '▶ Guided Demo';
       }
+      if (dom.toggleDemoBtn) dom.toggleDemoBtn.textContent = '⏹ Stop Demo';
+
+      if (dom.topbarDemoPill) {
+        dom.topbarDemoPill.classList.remove('hidden');
+        if (dom.topbarDemoScenario) dom.topbarDemoScenario.textContent = activeDemoScenarioName;
+        if (dom.topbarDemoTimer) dom.topbarDemoTimer.textContent = `${remSec.toFixed(1)}s`;
+      }
+      if (dom.demoScenarioPill) {
+        dom.demoScenarioPill.classList.remove('hidden');
+        if (dom.demoPillTitle) dom.demoPillTitle.textContent = activeDemoScenarioName;
+        if (dom.demoPillTimer) dom.demoPillTimer.textContent = `${remSec.toFixed(1)}s`;
+      }
+
+      updateScenarioButtons(activeDemoScenarioKey);
+    } else {
+      if (dom.demoBar) dom.demoBar.classList.add('hidden');
+      if (dom.toggleDemoBtn) dom.toggleDemoBtn.textContent = '▶ Guided Demo';
+      if (dom.topbarDemoPill) dom.topbarDemoPill.classList.add('hidden');
+      if (dom.demoScenarioPill) dom.demoScenarioPill.classList.add('hidden');
+
+      updateScenarioButtons(state.activeScenario);
     }
 
     // 12. Evaluation modal (if open)
@@ -964,9 +1022,26 @@
     }
   }
 
+  // --- Preset Scenario Buttons Selection ---
+  function updateScenarioButtons(activeKey) {
+    const key = activeKey || state.activeScenario || 'normal';
+    document.querySelectorAll('[data-scenario]').forEach(btn => {
+      if (btn.dataset.scenario === key) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+      } else {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      }
+    });
+  }
+
   // --- Node Selection ---
   function selectNode(nodeId) {
     state.activeNodeId = nodeId;
+    if (dom.scopeNodeLabel) {
+      dom.scopeNodeLabel.textContent = nodeId.toUpperCase();
+    }
     if (state.lastSnapshot) {
       updateUI(state.lastSnapshot);
     }
@@ -1061,14 +1136,42 @@
       });
     }
 
+    // Scenario Target Scope Toggle
+    if (dom.scopeNodeBtn && dom.scopeAllBtn) {
+      dom.scopeNodeBtn.addEventListener('click', () => {
+        state.scenarioScope = 'node';
+        dom.scopeNodeBtn.classList.add('active');
+        dom.scopeAllBtn.classList.remove('active');
+      });
+      dom.scopeAllBtn.addEventListener('click', () => {
+        state.scenarioScope = 'all';
+        dom.scopeAllBtn.classList.add('active');
+        dom.scopeNodeBtn.classList.remove('active');
+      });
+    }
+
     // Scenarios buttons
     document.querySelectorAll('[data-scenario]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const scenario = btn.dataset.scenario;
+        // If clicking already active non-normal scenario, toggle off smoothly back to normal
+        const targetScenario = (state.activeScenario === scenario && scenario !== 'normal') ? 'normal' : scenario;
+        state.activeScenario = targetScenario;
+        updateScenarioButtons(targetScenario);
+
+        const targetNodeId = state.scenarioScope === 'all' ? 'all' : state.activeNodeId;
+
         try {
-          await api('/api/sim/scenario', { method: 'POST', body: { scenario } });
-          refreshState();
-        } catch (e) { console.error(e); }
+          await api('/api/sim/scenario', {
+            method: 'POST',
+            body: {
+              name: targetScenario,
+              scenario: targetScenario,
+              node_id: targetNodeId
+            }
+          });
+          await refreshState();
+        } catch (e) { console.error('Failed to apply scenario:', e); }
       });
     });
 
@@ -1088,11 +1191,14 @@
     if (dom.addNodeBtn) {
       dom.addNodeBtn.addEventListener('click', async () => {
         try {
-          const res = await api('/api/sim/nodes', { method: 'POST' });
+          const res = await api('/api/sim/nodes', {
+            method: 'POST',
+            body: { action: 'add' }
+          });
           if (res.data && res.data.node_id) {
             state.activeNodeId = res.data.node_id;
           }
-          refreshState();
+          await refreshState();
         } catch (e) { console.error('Add node failed:', e); }
       });
     }
@@ -1100,8 +1206,17 @@
     if (dom.removeNodeBtn) {
       dom.removeNodeBtn.addEventListener('click', async () => {
         try {
-          await api(`/api/sim/nodes/${state.activeNodeId}`, { method: 'DELETE' });
-          refreshState();
+          const targetNode = state.activeNodeId;
+          const res = await api('/api/sim/nodes', {
+            method: 'POST',
+            body: { action: 'remove', node_id: targetNode }
+          });
+          if (res.data && res.data.nodes && res.data.nodes.length > 0) {
+            if (!res.data.nodes.includes(state.activeNodeId)) {
+              state.activeNodeId = res.data.nodes[0];
+            }
+          }
+          await refreshState();
         } catch (e) { console.error('Remove node failed:', e); }
       });
     }
@@ -1111,17 +1226,29 @@
       if (!slider) return;
 
       const start = () => state.activeDragging.add(id);
-      const end = () => {
-        state.activeDragging.delete(id);
-        onCommit();
+      const end = async () => {
+        try {
+          await onCommit();
+        } finally {
+          setTimeout(() => state.activeDragging.delete(id), 350);
+        }
       };
 
       slider.addEventListener('mousedown', start);
-      slider.addEventListener('touchstart', start);
-      slider.addEventListener('mouseup', end);
-      slider.addEventListener('touchend', end);
+      slider.addEventListener('touchstart', start, { passive: true });
+      window.addEventListener('mouseup', () => {
+        if (state.activeDragging.has(id)) {
+          end();
+        }
+      });
+      window.addEventListener('touchend', () => {
+        if (state.activeDragging.has(id)) {
+          end();
+        }
+      });
 
       slider.addEventListener('input', () => {
+        state.activeDragging.add(id);
         onInput();
         debounce(id, 150, onCommit);
       });
@@ -1136,11 +1263,13 @@
       },
       async () => {
         try {
+          const val = parseFloat(dom.sliderTemp.value);
           await api('/api/sim/controls', {
             method: 'POST',
             body: {
               node_id: state.activeNodeId,
-              target: { temperature: parseFloat(dom.sliderTemp.value) }
+              controls: { target: { temperature: val } },
+              target: { temperature: val }
             }
           });
         } catch (e) { console.error(e); }
@@ -1156,11 +1285,13 @@
       },
       async () => {
         try {
+          const val = parseFloat(dom.sliderHum.value);
           await api('/api/sim/controls', {
             method: 'POST',
             body: {
               node_id: state.activeNodeId,
-              target: { humidity: parseFloat(dom.sliderHum.value) }
+              controls: { target: { humidity: val } },
+              target: { humidity: val }
             }
           });
         } catch (e) { console.error(e); }
@@ -1176,11 +1307,13 @@
       },
       async () => {
         try {
+          const val = parseFloat(dom.sliderAqi.value);
           await api('/api/sim/controls', {
             method: 'POST',
             body: {
               node_id: state.activeNodeId,
-              target: { aqi: parseFloat(dom.sliderAqi.value) }
+              controls: { target: { aqi: val } },
+              target: { aqi: val }
             }
           });
         } catch (e) { console.error(e); }
@@ -1196,11 +1329,13 @@
       },
       async () => {
         try {
+          const val = parseFloat(dom.sliderNoise.value);
           await api('/api/sim/controls', {
             method: 'POST',
             body: {
               node_id: state.activeNodeId,
-              noise: parseFloat(dom.sliderNoise.value)
+              controls: { noise: val },
+              noise: val
             }
           });
         } catch (e) { console.error(e); }
@@ -1216,11 +1351,13 @@
       },
       async () => {
         try {
+          const val = parseFloat(dom.sliderRate.value);
           await api('/api/sim/controls', {
             method: 'POST',
             body: {
               node_id: state.activeNodeId,
-              send_rate_hz: parseFloat(dom.sliderRate.value)
+              controls: { send_rate_hz: val },
+              send_rate_hz: val
             }
           });
         } catch (e) { console.error(e); }
