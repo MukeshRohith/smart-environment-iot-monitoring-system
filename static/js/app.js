@@ -78,6 +78,11 @@
     dom.timescaleChip = document.getElementById('timescale-chip');
     dom.openEvalBtn = document.getElementById('open-eval-btn');
     dom.toggleDemoBtn = document.getElementById('toggle-demo-btn');
+    dom.togglePauseBtn = document.getElementById('toggle-pause-btn');
+    dom.pauseBtnIcon = document.getElementById('pause-btn-icon');
+    dom.pauseBtnLabel = document.getElementById('pause-btn-label');
+    dom.resetSystemBtn = document.getElementById('reset-system-btn');
+    dom.systemPausedPill = document.getElementById('system-paused-pill');
 
     // KPI
     dom.kpiNodes = document.getElementById('kpi-nodes');
@@ -737,6 +742,26 @@
     }
 
     // 2. Top bar
+    if (dom.togglePauseBtn) {
+      const isPaused = Boolean(snapshot.paused);
+      if (isPaused) {
+        dom.togglePauseBtn.classList.add('is-paused');
+        if (dom.pauseBtnIcon) dom.pauseBtnIcon.textContent = '▶';
+        if (dom.pauseBtnLabel) dom.pauseBtnLabel.textContent = 'Resume';
+      } else {
+        dom.togglePauseBtn.classList.remove('is-paused');
+        if (dom.pauseBtnIcon) dom.pauseBtnIcon.textContent = '⏸';
+        if (dom.pauseBtnLabel) dom.pauseBtnLabel.textContent = 'Pause';
+      }
+    }
+    if (dom.systemPausedPill) {
+      if (snapshot.paused) {
+        dom.systemPausedPill.classList.remove('hidden');
+      } else {
+        dom.systemPausedPill.classList.add('hidden');
+      }
+    }
+
     if (dom.profileSelect && document.activeElement !== dom.profileSelect) {
       dom.profileSelect.value = snapshot.profile;
     }
@@ -1483,6 +1508,60 @@
       });
     }
 
+    // System Demonstration Playback: Pause / Resume Entire System
+    if (dom.togglePauseBtn) {
+      dom.togglePauseBtn.addEventListener('click', async () => {
+        const isPaused = Boolean(state.lastSnapshot && state.lastSnapshot.paused);
+        try {
+          if (isPaused) {
+            await api('/api/system/resume', { method: 'POST' });
+          } else {
+            await api('/api/system/pause', { method: 'POST' });
+          }
+          refreshState();
+        } catch (err) {
+          console.error('Failed to toggle system pause:', err);
+        }
+      });
+    }
+
+    // System Demonstration Playback: Reset Entire System to Baseline
+    if (dom.resetSystemBtn) {
+      dom.resetSystemBtn.addEventListener('click', async () => {
+        const originalHtml = dom.resetSystemBtn.innerHTML;
+        dom.resetSystemBtn.innerHTML = '<span class="btn-icon">⏳</span> <span>Resetting...</span>';
+        dom.resetSystemBtn.disabled = true;
+
+        // Clear local UI dragging states and scenarios
+        state.activeDragging.clear();
+        state.activeScenario = 'normal';
+        document.querySelectorAll('.chip-btn[data-scenario]').forEach(b => {
+          b.classList.toggle('active', b.dataset.scenario === 'normal');
+        });
+
+        // Clear chart immediately for crisp visual feedback
+        if (state.chart) {
+          state.chart.data.labels = [];
+          state.chart.data.datasets.forEach(ds => { ds.data = []; });
+          state.chart.update('none');
+        }
+
+        try {
+          await api('/api/system/reset', { method: 'POST' });
+          await refreshState();
+          dom.resetSystemBtn.innerHTML = '<span class="btn-icon">✓</span> <span>Reset Done</span>';
+        } catch (err) {
+          console.error('Failed to reset system:', err);
+          dom.resetSystemBtn.innerHTML = '<span class="btn-icon">⚠️</span> <span>Error</span>';
+        } finally {
+          setTimeout(() => {
+            dom.resetSystemBtn.innerHTML = originalHtml;
+            dom.resetSystemBtn.disabled = false;
+          }, 1000);
+        }
+      });
+    }
+
     // Guided Demo button & controls
     if (dom.toggleDemoBtn) {
       dom.toggleDemoBtn.addEventListener('click', async () => {
@@ -1585,7 +1664,8 @@
           });
           startBenchmarkPolling();
         } catch (e) {
-          alert('Benchmark error: ' + (e.message || e));
+          console.error('Benchmark error:', e);
+          if (dom.benchPhaseLabel) dom.benchPhaseLabel.textContent = 'Error: ' + (e.message || e);
         }
       });
     }
@@ -1599,7 +1679,8 @@
           });
           startBenchmarkPolling();
         } catch (e) {
-          alert('Benchmark error: ' + (e.message || e));
+          console.error('Benchmark error:', e);
+          if (dom.benchPhaseLabel) dom.benchPhaseLabel.textContent = 'Error: ' + (e.message || e);
         }
       });
     }

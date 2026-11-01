@@ -56,10 +56,24 @@
         <div id="timescale-chip" class="pill-chip time-chip" title="Simulation Time Scale">1 s = 1.0 sim-min</div>
         <div id="connection-pill" class="pill-chip conn-chip connected"><span class="dot"></span> Online</div>
 
+        <div id="system-paused-pill" class="pill-chip paused-chip hidden" title="System simulation and ingestion is PAUSED">
+          <span class="dot paused-dot"></span> PAUSED
+        </div>
+
         <div id="topbar-demo-pill" class="topbar-demo-pill hidden" title="Active Guided Demo Scenario">
           <span class="pill-dot pulse"></span>
           <span id="topbar-demo-scenario">Normal</span>
           <span id="topbar-demo-timer" class="demo-pill-timer">15.0s</span>
+        </div>
+
+        <!-- System Demonstration Playback Controls -->
+        <div class="system-playback-group" role="group" aria-label="System Demonstration Playback Controls">
+          <button id="toggle-pause-btn" class="btn btn-secondary btn-playback" title="Pause or Resume the entire system simulation and ingestion">
+            <span id="pause-btn-icon">⏸</span> <span id="pause-btn-label">Pause</span>
+          </button>
+          <button id="reset-system-btn" class="btn btn-secondary btn-playback" title="Reset all telemetry buffers, charts, counters, and metrics to clean slate">
+            <span class="btn-icon">↺</span> <span>Reset</span>
+          </button>
         </div>
 
         <button id="open-eval-btn" class="btn btn-secondary">📊 Evaluation</button>

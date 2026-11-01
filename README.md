@@ -68,48 +68,37 @@ flowchart TD
 ## Installation & Setup
 
 ### Prerequisites
-- **Python 3.11+**
-- **Node.js 18+** (for frontend development server and proxy)
+- **Node.js 18+** (Node.js 20 or 22 recommended)
+- **npm** (comes with Node.js)
 
-### 1. Setup Virtual Environment & Python Dependencies
+### 1. Extract and Enter Directory
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd iot_monitor
-
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install pinned dependencies
-pip install -r requirements.txt
+# If using terminal to unzip:
+unzip smart-environment-iot-monitoring-system-main.zip
+cd smart-environment-iot-monitoring-system-main
 ```
 
-### 2. Install Node Dependencies
+### 2. Install Dependencies
 ```bash
 npm install
 ```
 
-### 3. Running the Application
-
-#### Option A: Full-Stack Mode with Vite Dev Server (Recommended)
-This starts Vite on port `3000` and automatically spawns the Python Flask backend daemon on port `5000`:
+### 3. Run the Development Server
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-#### Option B: Standalone Flask Server
-If running backend independently or serving static templates directly:
-```bash
-python3 run.py
-```
-Backend will be available at [http://127.0.0.1:5000](http://127.0.0.1:5000).
+The application will start on **[http://localhost:3000](http://localhost:3000)** with:
+- The full interactive dashboard UI
+- Active real-time multi-node simulated telemetry
+- Live polynomial forecasting and closed-loop actuation engine
+- Benchmark harness and guided demo walkthrough
 
-### 4. Running the Test Suite
-The codebase includes 53 unit and integration tests covering models, pipeline prioritization, wrangling, forecasting, actuators, simulator dynamics, metrics calculation, and API endpoints:
+### 4. Production Build & Run (Optional)
+To build and run in production mode:
 ```bash
-pytest -v
+npm run build
+npm start
 ```
 
 ---
@@ -180,6 +169,12 @@ All requests and responses use JSON (`Content-Type: application/json`). Errors r
   - `{"node_id": "node-1", "device": "fan"|"hvac"|"dehumidifier"|"purifier", "override": "on"|"off"|"auto"}`
 - `POST /api/actuators/restart`: Clear shutdown state for a node:
   - `{"node_id": "node-1"}`
+
+### Demonstration Playback Controls
+- `POST /api/system/pause`: Freeze physics simulation and pipeline ingestion.
+- `POST /api/system/resume`: Unfreeze simulation and resume live streaming.
+- `POST /api/system/reset`: Reset all runtime buffers, charts, counters, and metrics to clean baseline.
+- `GET /api/system/status`: Get current playback state (`{"status": "running" | "paused", "paused": boolean}`).
 
 ### Benchmarks & Guided Demo
 - `POST /api/benchmark/run`: Start asynchronous benchmark:
